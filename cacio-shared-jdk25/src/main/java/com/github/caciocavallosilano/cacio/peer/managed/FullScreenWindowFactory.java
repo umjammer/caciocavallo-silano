@@ -25,6 +25,7 @@
 
 package com.github.caciocavallosilano.cacio.peer.managed;
 
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GraphicsConfiguration;
 import java.util.Collections;
@@ -47,6 +48,25 @@ public class FullScreenWindowFactory implements PlatformWindowFactory {
         int width = Integer.parseInt(size.substring(0, x));
         int height = Integer.parseInt(size.substring(x + 1));
         screenSize = new Dimension(width, height);
+    }
+
+    /**
+     * The colour the screen shows where no window covers it. Backends paint
+     * their screen with this before anything else is drawn, and it is what
+     * gets cleared to when a window moves away or is hidden.
+     */
+    private static Color screenBackground;
+    static {
+        String color = System.getProperty("cacio.managed.background");
+        Color c = Color.WHITE;
+        if (color != null) {
+            try {
+                c = Color.decode(color);
+            } catch (NumberFormatException ex) {
+                // not a colour we understand, keep the default
+            }
+        }
+        screenBackground = c;
     }
 
     /**
@@ -173,6 +193,30 @@ public class FullScreenWindowFactory implements PlatformWindowFactory {
 
     public static Dimension getScreenDimension() {
         return screenSize;
+    }
+
+    /**
+     * Returns the colour the screen shows where no window covers it. Defaults
+     * to white, or to the {@code cacio.managed.background} property when that
+     * names a colour {@link Color#decode} understands.
+     *
+     * @return the screen background colour, never <code>null</code>
+     */
+    public static Color getScreenBackground() {
+        return screenBackground;
+    }
+
+    /**
+     * Sets the colour the screen shows where no window covers it. A backend
+     * that paints its own screen should call this before creating windows, or
+     * read {@link #getScreenBackground} and paint that.
+     *
+     * @param c the background colour, ignored when <code>null</code>
+     */
+    public static void setScreenBackground(Color c) {
+        if (c != null) {
+            screenBackground = c;
+        }
     }
 
     /**

@@ -178,7 +178,7 @@ class CacioComponentPeer<AWTComponentType extends Component,
         if (swingComponent != null) {
             // Setup the proxy window.
             proxy = new ProxyWindow(this, swingComponent);
-            proxy.syncBounds(awtComponent.getX(), awtComponent.getY(),
+            proxy.setBounds(awtComponent.getX(), awtComponent.getY(),
                             awtComponent.getWidth(), awtComponent.getHeight());
             proxy.setVisible(awtComponent.isVisible());
         }
@@ -594,7 +594,7 @@ class CacioComponentPeer<AWTComponentType extends Component,
             // may be different from the given paramenters if 'op' was SET_CLIENT_SIZE
             // or if this is a top level window and the system has forced some
             // different bounds.
-            proxy.syncBounds(awtComponent.getX(), awtComponent.getY(),
+            proxy.setBounds(awtComponent.getX(), awtComponent.getY(),
                             awtComponent.getWidth(), awtComponent.getHeight());
         }
         if (swingComponent != null) {

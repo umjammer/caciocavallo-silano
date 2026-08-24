@@ -28,7 +28,11 @@ package com.github.caciocavallosilano.cacio.peer;
 import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.Dialog;
+import java.awt.Dimension;
+import java.awt.Frame;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.Window;
 import java.awt.event.FocusEvent;
 import java.awt.event.KeyEvent;
@@ -144,42 +148,172 @@ public class ProxyWindow extends Window {
 
     }
 
+    /** How close to an edge a press has to be to resize rather than move. */
+    private static final int BORDER_DRAG_THICKNESS = 5;
+
+    private static final int EDGE_LEFT = 1;
+    private static final int EDGE_RIGHT = 2;
+    private static final int EDGE_TOP = 4;
+    private static final int EDGE_BOTTOM = 8;
+
+    /** Smallest window a resize will leave behind. */
+    private static final Dimension MIN_SIZE = new Dimension(60, 40);
+
     /**
-     * Where the pointer sat relative to the window when a drag of the window
-     * decoration started, or <code>null</code> while no such drag is going on.
+     * Where the pointer sat relative to the window when a move of the window
+     * decoration started, or <code>null</code> while no move is going on.
      */
     private Point decorationDragOffset;
 
+    /** The edges being dragged while resizing, or 0 while not resizing. */
+    private int resizeEdges;
+
+    /** Where the pointer and the window were when the resize started. */
+    private Point resizeStart;
+    private Rectangle resizeBounds;
+
     /**
-     * Moves the window along with a drag of its decoration.
+     * Moves or resizes the window along with a drag of its decoration.
      *
      * The decoration is drawn by a JRootPane inside this proxy, and the look
      * and feel installs its own drag handling on the window that root pane
-     * belongs to -- but that handling only moves Frames and Dialogs, and this
-     * proxy is a plain Window, so it never engages. The move is done here
-     * instead, and reaches the AWT component through {@link #setBounds}.
+     * belongs to -- but that handling only moves and resizes Frames and
+     * Dialogs, and this proxy is a plain Window, so it never engages. It is
+     * done here instead, and reaches the AWT component through
+     * {@link #setBounds}.
      *
      * @param e a mouse event no lightweight child wanted
      */
     private void trackDecorationDrag(MouseEvent e) {
         switch (e.getID()) {
         case MouseEvent.MOUSE_PRESSED:
-            decorationDragOffset = isOnDecoration(e.getPoint())
-                ? new Point(e.getXOnScreen() - getX(), e.getYOnScreen() - getY())
-                : null;
+            decorationDragOffset = null;
+            resizeEdges = 0;
+            Component pressed = targetComponent();
+            if (pressed == null || ! isOnDecoration(e.getPoint())) {
+                break;
+            }
+            resizeEdges = isTargetResizable() ? edgesAt(e.getPoint()) : 0;
+            if (resizeEdges != 0) {
+                resizeStart = new Point(e.getXOnScreen(), e.getYOnScreen());
+                resizeBounds = pressed.getBounds();
+            } else {
+                decorationDragOffset =
+                    new Point(e.getXOnScreen() - pressed.getX(),
+                              e.getYOnScreen() - pressed.getY());
+            }
             break;
         case MouseEvent.MOUSE_DRAGGED:
-            if (decorationDragOffset != null) {
-                setLocation(e.getXOnScreen() - decorationDragOffset.x,
-                            e.getYOnScreen() - decorationDragOffset.y);
+            Component dragged = targetComponent();
+            if (dragged == null) {
+                break;
+            }
+            if (resizeEdges != 0) {
+                resizeTo(dragged, e.getXOnScreen(), e.getYOnScreen());
+            } else if (decorationDragOffset != null) {
+                dragged.setLocation(e.getXOnScreen() - decorationDragOffset.x,
+                                    e.getYOnScreen() - decorationDragOffset.y);
             }
             break;
         case MouseEvent.MOUSE_RELEASED:
             decorationDragOffset = null;
+            resizeEdges = 0;
             break;
         default:
             break;
         }
+    }
+
+    /**
+     * @return the edges of this window the point sits on, as a mask of
+     *         EDGE_*, or 0 when it is not close enough to any of them
+     */
+    private int edgesAt(Point p) {
+        Component c = targetComponent();
+        int edges = 0;
+
+        if (c == null) {
+            return 0;
+        }
+
+        if (p.x < BORDER_DRAG_THICKNESS) {
+            edges |= EDGE_LEFT;
+        } else if (p.x >= c.getWidth() - BORDER_DRAG_THICKNESS) {
+            edges |= EDGE_RIGHT;
+        }
+
+        if (p.y < BORDER_DRAG_THICKNESS) {
+            edges |= EDGE_TOP;
+        } else if (p.y >= c.getHeight() - BORDER_DRAG_THICKNESS) {
+            edges |= EDGE_BOTTOM;
+        }
+
+        return edges;
+    }
+
+    private Component targetComponent() {
+        return target == null ? null : target.getAWTComponent();
+    }
+
+    /** Applies a resize that has been dragged out to the given screen point. */
+    private void resizeTo(Component c, int screenX, int screenY) {
+        int dx = screenX - resizeStart.x;
+        int dy = screenY - resizeStart.y;
+        Rectangle r = new Rectangle(resizeBounds);
+
+        if ((resizeEdges & EDGE_LEFT) != 0) {
+            r.x += dx;
+            r.width -= dx;
+        } else if ((resizeEdges & EDGE_RIGHT) != 0) {
+            r.width += dx;
+        }
+
+        if ((resizeEdges & EDGE_TOP) != 0) {
+            r.y += dy;
+            r.height -= dy;
+        } else if ((resizeEdges & EDGE_BOTTOM) != 0) {
+            r.height += dy;
+        }
+
+        Dimension min = minimumWindowSize();
+
+        // dragging the left or top edge past the minimum has to stop the edge
+        // rather than carry the opposite one along with it
+        if (r.width < min.width) {
+            if ((resizeEdges & EDGE_LEFT) != 0) {
+                r.x = resizeBounds.x + resizeBounds.width - min.width;
+            }
+            r.width = min.width;
+        }
+        if (r.height < min.height) {
+            if ((resizeEdges & EDGE_TOP) != 0) {
+                r.y = resizeBounds.y + resizeBounds.height - min.height;
+            }
+            r.height = min.height;
+        }
+
+        c.setBounds(r.x, r.y, r.width, r.height);
+    }
+
+    private Dimension minimumWindowSize() {
+        Component c = targetComponent();
+        Dimension min = c == null ? null : c.getMinimumSize();
+        if (min == null) {
+            return MIN_SIZE;
+        }
+        return new Dimension(Math.max(min.width, MIN_SIZE.width),
+                             Math.max(min.height, MIN_SIZE.height));
+    }
+
+    private boolean isTargetResizable() {
+        Component c = targetComponent();
+        if (c instanceof Frame) {
+            return ((Frame) c).isResizable();
+        }
+        if (c instanceof Dialog) {
+            return ((Dialog) c).isResizable();
+        }
+        return false;
     }
 
     /**
@@ -205,46 +339,6 @@ public class ProxyWindow extends Window {
         return c != null && c.isShowing()
                && SwingUtilities.convertRectangle(c.getParent(), c.getBounds(),
                                                   this).contains(p);
-    }
-
-    /**
-     * Whether the bounds currently being set come from the AWT component, in
-     * which case they must not be sent straight back to it.
-     */
-    private boolean syncingFromTarget;
-
-    /**
-     * Takes over the bounds of the AWT component this window stands in for.
-     * Unlike {@link #setBounds}, this does not push them back onto it.
-     */
-    void syncBounds(int x, int y, int width, int height) {
-        syncingFromTarget = true;
-        try {
-            setBounds(x, y, width, height);
-        } finally {
-            syncingFromTarget = false;
-        }
-    }
-
-    /**
-     * Window decorations move and resize the window they are installed on,
-     * which is this proxy rather than the AWT component it stands in for --
-     * so a move or resize that did not come from the component itself is
-     * passed on to it, and comes back to us through
-     * {@link #syncBounds}.
-     */
-    @Override
-    public void setBounds(int x, int y, int width, int height) {
-        super.setBounds(x, y, width, height);
-
-        if (! syncingFromTarget && target != null) {
-            Component c = target.getAWTComponent();
-            if (c != null && (c.getX() != x || c.getY() != y
-                              || c.getWidth() != width
-                              || c.getHeight() != height)) {
-                c.setBounds(x, y, width, height);
-            }
-        }
     }
 
     /**

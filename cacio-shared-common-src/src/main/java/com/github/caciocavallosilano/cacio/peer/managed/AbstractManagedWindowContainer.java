@@ -124,7 +124,20 @@ abstract class AbstractManagedWindowContainer
         int id = event.getId();
         if (id >= MouseEvent.MOUSE_FIRST
             && id <= MouseEvent.MOUSE_LAST) {
-            ManagedWindow source = findWindowAt(event.getX(), event.getY());
+            /*
+             * A drag keeps going to the window the press landed on, even once
+             * the pointer has left it -- otherwise dragging a window's edge
+             * outwards, or anything else that leads the pointer off the
+             * window, stops as soon as it crosses the border.
+             */
+            ManagedWindow source = mouseGrab != null
+                ? mouseGrab
+                : findWindowAt(event.getX(), event.getY());
+            if (id == MouseEvent.MOUSE_PRESSED) {
+                mouseGrab = source;
+            } else if (id == MouseEvent.MOUSE_RELEASED) {
+                mouseGrab = null;
+            }
             if (source != null) {
                 event.setSource(source);
                 Rectangle b = source.getBounds();
@@ -160,6 +173,13 @@ abstract class AbstractManagedWindowContainer
             return false;
         }
     }
+
+    /**
+     * The window a press went to, held until the button comes back up so that
+     * the drag in between stays with it. <code>null</code> when no button is
+     * down.
+     */
+    private ManagedWindow mouseGrab;
 
     ManagedWindow findWindowAt(int x, int y) {
         // Search from topmost to bottommost component and see if one matches.
@@ -219,7 +239,8 @@ abstract class AbstractManagedWindowContainer
                 }
             }
         }
-        Graphics2D g = getClippedGraphics(Color.WHITE, Color.WHITE,
+        Color background = FullScreenWindowFactory.getScreenBackground();
+        Graphics2D g = getClippedGraphics(background, background,
                                           new Font(Font.DIALOG, Font.BOLD, 12),
                                           rects);
         g.clearRect(x, y, w, h);
