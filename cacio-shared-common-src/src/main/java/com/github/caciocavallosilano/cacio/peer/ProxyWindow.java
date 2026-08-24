@@ -28,6 +28,7 @@ package com.github.caciocavallosilano.cacio.peer;
 import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.Cursor;
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.Frame;
@@ -82,6 +83,7 @@ public class ProxyWindow extends Window {
                                        e.getClickCount(), e.isPopupTrigger(),
                                        e.getButton());
         // IMPORTANT: See comment on the helper method!
+        updateDecorationCursor(me);
         if (! doLightweightDispatching(e)) {
             processMouseEvent(me);
             trackDecorationDrag(me);
@@ -95,6 +97,7 @@ public class ProxyWindow extends Window {
                                        e.getClickCount(), e.isPopupTrigger(),
                                        e.getButton());
         // IMPORTANT: See comment on the helper method!
+        updateDecorationCursor(me);
         if (! doLightweightDispatching(e)) {
             processMouseMotionEvent(me);
             trackDecorationDrag(me);
@@ -221,6 +224,53 @@ public class ProxyWindow extends Window {
             break;
         default:
             break;
+        }
+    }
+
+    /** The cursor last handed to the platform, so it is only set when it changes. */
+    private int shownCursor = -1;
+
+    /**
+     * Points the cursor at what a drag from here would do: a resize cursor on
+     * each edge and corner of the decoration, a move cursor over the rest of
+     * it, and the default cursor everywhere else.
+     *
+     * This runs for every mouse event over the window, including the ones a
+     * lightweight child goes on to take, so that moving off the decoration
+     * puts the cursor back.
+     */
+    private void updateDecorationCursor(MouseEvent e) {
+        int type = Cursor.DEFAULT_CURSOR;
+
+        if (resizeEdges != 0) {
+            type = cursorForEdges(resizeEdges);
+        } else if (decorationDragOffset != null) {
+            type = Cursor.MOVE_CURSOR;
+        } else if (isOnDecoration(e.getPoint())) {
+            int edges = isTargetResizable() ? edgesAt(e.getPoint()) : 0;
+            type = edges != 0 ? cursorForEdges(edges) : Cursor.MOVE_CURSOR;
+        }
+
+        if (type != shownCursor) {
+            shownCursor = type;
+            CacioComponentPeer peer = target;
+            if (peer != null && peer.platformWindow != null) {
+                peer.platformWindow.setCursor(Cursor.getPredefinedCursor(type));
+            }
+        }
+    }
+
+    private static int cursorForEdges(int edges) {
+        switch (edges) {
+        case EDGE_LEFT | EDGE_TOP:      return Cursor.NW_RESIZE_CURSOR;
+        case EDGE_RIGHT | EDGE_TOP:     return Cursor.NE_RESIZE_CURSOR;
+        case EDGE_LEFT | EDGE_BOTTOM:   return Cursor.SW_RESIZE_CURSOR;
+        case EDGE_RIGHT | EDGE_BOTTOM:  return Cursor.SE_RESIZE_CURSOR;
+        case EDGE_LEFT:                 return Cursor.W_RESIZE_CURSOR;
+        case EDGE_RIGHT:                return Cursor.E_RESIZE_CURSOR;
+        case EDGE_TOP:                  return Cursor.N_RESIZE_CURSOR;
+        case EDGE_BOTTOM:               return Cursor.S_RESIZE_CURSOR;
+        default:                        return Cursor.DEFAULT_CURSOR;
         }
     }
 

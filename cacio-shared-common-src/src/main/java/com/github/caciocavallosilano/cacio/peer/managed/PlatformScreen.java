@@ -26,6 +26,7 @@
 package com.github.caciocavallosilano.cacio.peer.managed;
 
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
@@ -62,5 +63,28 @@ public interface PlatformScreen {
 
     abstract Graphics2D getClippedGraphics(Color fg, Color bg, Font f,
                                            List<Rectangle> clipRects);
+
+    /**
+     * Told when a window's pixels move as a block, before the areas involved
+     * are repainted. A backend that can move pixels more cheaply than it can
+     * redraw them may use this as a hint; the repaint that follows is the
+     * safety net, so ignoring it only costs redrawing.
+     *
+     * @param from the area the window occupied, in screen coordinates
+     * @param dx how far it moved horizontally
+     * @param dy how far it moved vertically
+     */
+    default void windowMoved(Rectangle from, int dx, int dy) {
+    }
+
+    /**
+     * Shows the given cursor over the screen. Backends that can show a mouse
+     * cursor override this; the default does nothing, so a backend that cannot
+     * (or has not got round to it) simply keeps whatever it was showing.
+     *
+     * @param cursor the cursor to show, never <code>null</code>
+     */
+    default void setCursor(Cursor cursor) {
+    }
 
 }

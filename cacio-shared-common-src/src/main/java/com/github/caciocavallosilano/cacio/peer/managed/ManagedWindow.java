@@ -37,6 +37,7 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
 import java.awt.Image;
+import java.awt.Cursor;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -236,6 +237,15 @@ class ManagedWindow
         // Make this a little more intelligent.
 
         if (isVisible()) {
+            // A pure move shifts the window's pixels; a backend that can blit
+            // them is better off doing that than redrawing the whole window.
+            if (oldW == width && oldH == height && (oldX != x || oldY != y)) {
+                ScreenManagedWindowContainer screen = getScreenContainer();
+                if (screen != null) {
+                    screen.windowMoved(new Rectangle(oldX, oldY, oldW, oldH),
+                                       x - oldX, y - oldY);
+                }
+            }
             // First we repaint the parent at the old bounds.
             parent.repaint(oldX, oldY, oldW, oldH);
             // And then we repaint the parent at the new bounds.
@@ -464,6 +474,28 @@ class ManagedWindow
     public Image getBackBuffer() {
         // Nothing to do here yet.        
         return null;
+    }
+
+    /**
+     * Shows the given cursor, by handing it to the screen this window
+     * ultimately sits on.
+     */
+    @Override
+    public void setCursor(Cursor cursor) {
+        ScreenManagedWindowContainer screen = getScreenContainer();
+        if (screen != null) {
+            screen.setCursor(cursor);
+        }
+    }
+
+    /** @return the screen this window ultimately sits on, or null */
+    private ScreenManagedWindowContainer getScreenContainer() {
+        ManagedWindowContainer c = parent;
+        while (c instanceof ManagedWindow) {
+            c = ((ManagedWindow) c).getParent();
+        }
+        return c instanceof ScreenManagedWindowContainer
+            ? (ScreenManagedWindowContainer) c : null;
     }
 
     ManagedWindowContainer getParent() {

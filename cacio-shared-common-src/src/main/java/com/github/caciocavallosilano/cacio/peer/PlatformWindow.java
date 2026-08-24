@@ -28,6 +28,7 @@ package com.github.caciocavallosilano.cacio.peer;
 import java.awt.AWTException;
 import java.awt.BufferCapabilities;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -198,6 +199,14 @@ public interface PlatformWindow {
      *        <code>false</code> hides it.
      */
     void setVisible(boolean b);
+
+    /**
+     * Shows the given cursor over this window.
+     *
+     * @param cursor the cursor to show, never <code>null</code>
+     */
+    default void setCursor(Cursor cursor) {
+    }
 
     /**
      * Creates back buffers for flipping. This method may throw an AWTException

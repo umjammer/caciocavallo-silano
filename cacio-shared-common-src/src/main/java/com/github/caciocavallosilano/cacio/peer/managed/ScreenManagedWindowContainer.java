@@ -26,6 +26,7 @@
 package com.github.caciocavallosilano.cacio.peer.managed;
 
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsConfiguration;
@@ -45,6 +46,16 @@ public class ScreenManagedWindowContainer extends AbstractManagedWindowContainer
     public Graphics2D getClippedGraphics(Color fg, Color bg, Font font,
                                          List<Rectangle> clipRects) {
         return screen.getClippedGraphics(fg, bg, font, clipRects);
+    }
+
+    /** Passes a block move of a window's pixels on to the screen. */
+    void windowMoved(Rectangle from, int dx, int dy) {
+        screen.windowMoved(from, dx, dy);
+    }
+
+    /** Shows the given cursor over this screen. */
+    void setCursor(Cursor cursor) {
+        screen.setCursor(cursor);
     }
 
     @Override
