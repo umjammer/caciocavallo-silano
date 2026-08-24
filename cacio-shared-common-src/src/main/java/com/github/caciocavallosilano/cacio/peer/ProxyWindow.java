@@ -26,7 +26,9 @@
 package com.github.caciocavallosilano.cacio.peer;
 
 import java.awt.AWTEvent;
+import java.awt.Component;
 import java.awt.Container;
+import java.awt.Point;
 import java.awt.Window;
 import java.awt.event.FocusEvent;
 import java.awt.event.KeyEvent;
@@ -34,6 +36,8 @@ import java.awt.event.MouseEvent;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import javax.swing.JComponent;
+import javax.swing.JRootPane;
+import javax.swing.SwingUtilities;
 
 /**
  * A specialized Window implementation with the sole purpose of providing
@@ -74,7 +78,10 @@ public class ProxyWindow extends Window {
                                        e.getClickCount(), e.isPopupTrigger(),
                                        e.getButton());
         // IMPORTANT: See comment on the helper method!
-        doLightweightDispatching(e);
+        if (! doLightweightDispatching(e)) {
+            processMouseEvent(me);
+            trackDecorationDrag(me);
+        }
     }
 
     void handleMouseMotionEvent(MouseEvent e) {
@@ -84,7 +91,10 @@ public class ProxyWindow extends Window {
                                        e.getClickCount(), e.isPopupTrigger(),
                                        e.getButton());
         // IMPORTANT: See comment on the helper method!
-        doLightweightDispatching(e);
+        if (! doLightweightDispatching(e)) {
+            processMouseMotionEvent(me);
+            trackDecorationDrag(me);
+        }
     }
 
     private static Field dispatcherField;
@@ -112,22 +122,129 @@ public class ProxyWindow extends Window {
      * side effects, like popups closing too early.
      *
      * @param e the event to be dispatched
+     *
+     * @return <code>true</code> when a lightweight child took the event,
+     *         <code>false</code> when it is left for this window to handle
      */
-    private void doLightweightDispatching(AWTEvent e) {
+    private boolean doLightweightDispatching(AWTEvent e) {
         if (dispatcherField == null) {
             initReflection();
         }
         try {
             Object dispatcher = dispatcherField.get(this);
             if (dispatcher != null) {
-                dispatchMethod.invoke(dispatcher, e);
+                return (Boolean) dispatchMethod.invoke(dispatcher, e);
             }
+            return false;
         } catch (Exception ex) {
             InternalError err = new InternalError();
             err.initCause(ex);
             throw err;
         }
 
+    }
+
+    /**
+     * Where the pointer sat relative to the window when a drag of the window
+     * decoration started, or <code>null</code> while no such drag is going on.
+     */
+    private Point decorationDragOffset;
+
+    /**
+     * Moves the window along with a drag of its decoration.
+     *
+     * The decoration is drawn by a JRootPane inside this proxy, and the look
+     * and feel installs its own drag handling on the window that root pane
+     * belongs to -- but that handling only moves Frames and Dialogs, and this
+     * proxy is a plain Window, so it never engages. The move is done here
+     * instead, and reaches the AWT component through {@link #setBounds}.
+     *
+     * @param e a mouse event no lightweight child wanted
+     */
+    private void trackDecorationDrag(MouseEvent e) {
+        switch (e.getID()) {
+        case MouseEvent.MOUSE_PRESSED:
+            decorationDragOffset = isOnDecoration(e.getPoint())
+                ? new Point(e.getXOnScreen() - getX(), e.getYOnScreen() - getY())
+                : null;
+            break;
+        case MouseEvent.MOUSE_DRAGGED:
+            if (decorationDragOffset != null) {
+                setLocation(e.getXOnScreen() - decorationDragOffset.x,
+                            e.getYOnScreen() - decorationDragOffset.y);
+            }
+            break;
+        case MouseEvent.MOUSE_RELEASED:
+            decorationDragOffset = null;
+            break;
+        default:
+            break;
+        }
+    }
+
+    /**
+     * @return whether the point is on the decoration drawn around the window,
+     *         rather than on the menu bar or the contents
+     */
+    private boolean isOnDecoration(Point p) {
+        if (getComponentCount() == 0
+            || ! (getComponent(0) instanceof JRootPane)) {
+            return false;
+        }
+
+        JRootPane rootPane = (JRootPane) getComponent(0);
+        if (rootPane.getWindowDecorationStyle() == JRootPane.NONE) {
+            return false;
+        }
+
+        return ! covers(rootPane.getContentPane(), p)
+               && ! covers(rootPane.getJMenuBar(), p);
+    }
+
+    private boolean covers(Component c, Point p) {
+        return c != null && c.isShowing()
+               && SwingUtilities.convertRectangle(c.getParent(), c.getBounds(),
+                                                  this).contains(p);
+    }
+
+    /**
+     * Whether the bounds currently being set come from the AWT component, in
+     * which case they must not be sent straight back to it.
+     */
+    private boolean syncingFromTarget;
+
+    /**
+     * Takes over the bounds of the AWT component this window stands in for.
+     * Unlike {@link #setBounds}, this does not push them back onto it.
+     */
+    void syncBounds(int x, int y, int width, int height) {
+        syncingFromTarget = true;
+        try {
+            setBounds(x, y, width, height);
+        } finally {
+            syncingFromTarget = false;
+        }
+    }
+
+    /**
+     * Window decorations move and resize the window they are installed on,
+     * which is this proxy rather than the AWT component it stands in for --
+     * so a move or resize that did not come from the component itself is
+     * passed on to it, and comes back to us through
+     * {@link #syncBounds}.
+     */
+    @Override
+    public void setBounds(int x, int y, int width, int height) {
+        super.setBounds(x, y, width, height);
+
+        if (! syncingFromTarget && target != null) {
+            Component c = target.getAWTComponent();
+            if (c != null && (c.getX() != x || c.getY() != y
+                              || c.getWidth() != width
+                              || c.getHeight() != height)) {
+                c.setBounds(x, y, width, height);
+            }
+        }
     }
 
     /**
