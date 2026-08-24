@@ -40,6 +40,8 @@ import java.awt.Image;
 import java.awt.Cursor;
 import java.awt.Insets;
 import java.awt.Point;
+import java.awt.event.ComponentEvent;
+import java.awt.Window;
 import java.awt.Rectangle;
 import java.awt.BufferCapabilities.FlipContents;
 import java.awt.event.MouseEvent;
@@ -233,6 +235,26 @@ class ManagedWindow
         this.y = y;
         this.width = width;
         this.height = height;
+
+        /*
+         * Tell the window its bounds moved. A toplevel relays out its contents
+         * from COMPONENT_RESIZED (Window.dispatchEventImpl invalidates and
+         * validates on it), so without this the contents keep the layout they
+         * had before the resize -- they are drawn and hit-tested at their old
+         * places.
+         */
+        Component c = cacioComponent.getAWTComponent();
+        if (c instanceof Window) {
+            if (oldW != width || oldH != height) {
+                cacioComponent.handlePeerEvent(
+                    new ComponentEvent(c, ComponentEvent.COMPONENT_RESIZED));
+            }
+            if (oldX != x || oldY != y) {
+                cacioComponent.handlePeerEvent(
+                    new ComponentEvent(c, ComponentEvent.COMPONENT_MOVED));
+            }
+        }
+
         // TODO: We brute-force repaint everything that could be damaged.
         // Make this a little more intelligent.
 
