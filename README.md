@@ -1,4 +1,29 @@
-# Caciocavallo headless Swing UI testing
+[![Release](https://jitpack.io/v/umjammer/caciocavallo-silano.svg)](https://jitpack.io/#umjammer/caciocavallo-silano)
+[![Java CI](https://github.com/umjammer/caciocavallo-silano/actions/workflows/maven.yml/badge.svg)](https://github.com/umjammer/caciocavallo-silano/actions/workflows/maven.yml)
+[![CodeQL](https://github.com/umjammer/caciocavallo-silano/actions/workflows/codeql.yml/badge.svg)](https://github.com/umjammer/caciocavallo-silano/actions/workflows/codeql.yml)
+![Java](https://img.shields.io/badge/Java-25-b07219)
+
+# caciocavallo-sliano
+
+<img alt="logo" src="duke_caciocavallo_silano.png" width="160" />
+
+java awt base
+
+## Install
+
+- [maven](https://jitpack.io/#umjammer/caciocavallo-silano)
+
+## Usage
+
+## References
+
+- [original](https://github.com/CaciocavalloSilano/caciocavallo)
+
+## TODO
+
+---
+
+# [Original](https://github.com/CaciocavalloSilano/caciocavallo)
 
 [![Actions Status](https://github.com/CaciocavalloSilano/caciocavallo/workflows/Java%20CI/badge.svg)](https://github.com/CaciocavalloSilano/caciocavallo/actions)
 [![License](https://img.shields.io/github/license/CaciocavalloSilano/caciocavallo.svg)](https://raw.githubusercontent.com/CaciocavalloSilano/caciocavallo/master/LICENSE)
@@ -247,3 +272,7 @@ This commit 314a544b4970d1108be99adbd3f9c5e70a102b3f contains the original code 
 ## See also
 
 [AssertJ Swing](https://joel-costigliola.github.io/assertj/assertj-swing.html)
+
+---
+
+<sub>image designed by @umjammer, drawn by nano banana</sub>
